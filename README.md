@@ -48,7 +48,7 @@ OneMeal app can be dowloaded from [Google Play][OneMealApp].
 
 ## License
 
-Apache 2.0
+GNU
 
 ## Contact
 
