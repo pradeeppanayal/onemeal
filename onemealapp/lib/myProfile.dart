@@ -3,6 +3,9 @@ import 'package:flutter/widgets.dart';
 import 'package:onemealapp/auth.dart';
 import 'package:onemealapp/utils.dart';
 
+/**
+ * @author Pradeep CH
+ */
 class MyProfile extends StatefulWidget {
   @override
   MyProfileState createState() => MyProfileState();
@@ -65,8 +68,8 @@ class MyProfileState extends State<MyProfile> {
 
   String _fetchPreferedName() {
     if (authService.oneMealCurrentUser != null &&
-        authService.oneMealCurrentUser['preferredName'] != null)
-      return authService.oneMealCurrentUser['preferredName'];
+        authService.oneMealCurrentUser.preferredName != null)
+      return authService.oneMealCurrentUser.preferredName;
     return authService.currentUser.displayName;
   }
 

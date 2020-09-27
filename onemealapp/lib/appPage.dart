@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:onemealapp/auth.dart';
+import 'package:onemealapp/beans/hunger.dart';
+import 'package:onemealapp/doa/hungerDoa.dart';
 import 'package:onemealapp/hungerInfo.dart';
 import 'package:onemealapp/hungerReport.dart';
 import 'package:onemealapp/location.dart';
-import 'package:onemealapp/main.dart';
-import 'package:onemealapp/oneMealRestClient.dart';
-import 'package:onemealapp/userprofile.dart';
+import 'package:onemealapp/userAccount.dart';
 import 'package:onemealapp/utils.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
@@ -27,12 +28,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   final Completer<GoogleMapController> _controller = Completer();
   PanelController panelController = new PanelController();
   PanelController panelControllerHungerReport = new PanelController();
-  PanelController panelControllerUser = new PanelController();
+  PanelController panelControllerUserAccount = new PanelController();
   static LatLng currentLocation = Maputil.getDefaultLocation();
   LatLng _hungerLocationToAdd;
   bool loading = true;
   bool hasUserLocation = false;
-  dynamic _selectedElement = {};
+  HungerItem _selectedElement;
   Set<Marker> _markers = Set();
 
   int _currentIndex = 0;
@@ -72,20 +73,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                 callback: _hunegrInfoUpdate,
                 loadingStatusUpdate: loadingStatusUpdate,
                 loading: loading),
-            HungerReportWidget(
-                hungerLocationToAdd: _hungerLocationToAdd,
-                userLocation: currentLocation,
-                panelControllerHungerReport: panelControllerHungerReport,
-                callBack: _hungerReoprted,
-                loadingStatusUpdate: loadingStatusUpdate,
-                loading: loading),
-            UserProfileWidget(
-              panelController: panelControllerUser,
-              callback: userInfoUpdated,
-              loadingStateUpdateCallBack: loadingStatusUpdate,
-              loading: loading,
-              goHome: goHome,
-            ),
+            HungerReportWidget(panelControllerHungerReport,
+                _hungerLocationToAdd, _hungerReoprted, currentLocation),
+            UserAccountPage(panelControllerUserAccount),
             Visibility(
               child: Positioned(
                   width: MediaQuery.of(context).size.width,
@@ -118,8 +108,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   void _menuTaped(int index) {
     panelControllerHungerReport.panelPosition = 0.0;
     panelController.panelPosition = 0.0;
-    panelControllerUser.panelPosition = 0.0;
-
+    panelControllerUserAccount.panelPosition = 0.0;
     switch (index) {
       case 0:
         fetchHunger();
@@ -129,7 +118,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         reportHunger(currentLocation);
         break;
       case 2:
-        showProfile();
+        panelControllerUserAccount.panelPosition = 1.0;
         break;
     }
   }
@@ -194,7 +183,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     }
     _markers.clear();
     loadingStatusUpdate(true);
-    oneMealRestClient
+    hungerDOA
         .getHungers(currentLocation)
         .then((value) => {
               setState(() {
@@ -212,17 +201,16 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                     UserInfoMessageMode.WARN);
                 value.forEach((element) {
                   _markers.add(Marker(
-                      icon: MarkerUtil.getIcon(element['status']),
-                      markerId: MarkerId(element['id']),
-                      position: LatLng(element["location"]["_latitude"],
-                          element["location"]["_longitude"]),
+                      icon: MarkerUtil.getIcon(element.status),
+                      markerId: MarkerId(element.id),
+                      position: element.location,
                       onTap: () {
                         _showDetails(element);
                       },
                       infoWindow: InfoWindow(
-                          title: element['title'] == null
+                          title: element.title == null
                               ? "No title"
-                              : element['title'])));
+                              : element.title)));
                 });
                 loadingStatusUpdate(false);
               })
@@ -253,12 +241,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     });
     UserInfoMessageUtil.showMessage(
         "Drag the marker to the exact location.", UserInfoMessageMode.INFO);
-  }
-
-  void showProfile() {
-    _markers.clear();
-    _moveCameraToCurrentlocation();
-    panelControllerUser.panelPosition = 1.0;
   }
 
   _showDetails(element) {
@@ -340,14 +322,10 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     if (val) {
       setState(() {
         _markers.clear();
-        _selectedElement = {};
+        _selectedElement = null;
       });
       fetchHunger();
     }
-  }
-
-  void userInfoUpdated(val) {
-    FocusScope.of(context).unfocus();
   }
 
   void _hungerReoprted(bool val) {
@@ -366,10 +344,5 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     setState(() {
       loading = val;
     });
-  }
-
-  void goHome() {
-    Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (context) => MyHomePage()));
   }
 }

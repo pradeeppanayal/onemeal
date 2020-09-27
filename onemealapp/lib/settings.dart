@@ -7,6 +7,9 @@ import 'package:onemealapp/main.dart';
 import 'package:onemealapp/myProfile.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/**
+ * @author Pradeep CH
+ */
 class SettingsItems extends StatelessWidget {
   final Completer<BuildContext> _context = Completer();
 
@@ -15,14 +18,14 @@ class SettingsItems extends StatelessWidget {
     _context.complete(context);
     return Container(
         width: MediaQuery.of(context).size.width - 10,
-        height: MediaQuery.of(context).size.height * 0.5,
+        height: MediaQuery.of(context).size.height * 0.8,
         child: ListView(
           children: [
             Card(
                 child: ListTile(
               title: Text("My Profile"),
               subtitle: Text("Manage your profile"),
-              leading: Icon(Icons.verified_user),
+              leading: Icon(Icons.verified_user, color: Colors.green),
               onTap: () => {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (context) => MyProfile()))
@@ -32,7 +35,7 @@ class SettingsItems extends StatelessWidget {
                 child: ListTile(
               title: Text("Help"),
               subtitle: Text("Visit us to know more"),
-              leading: Icon(Icons.help),
+              leading: Icon(Icons.help, color: Colors.blue),
               onTap: () =>
                   {launch("https://sites.google.com/view/onemealinfo")},
             )),
@@ -40,7 +43,7 @@ class SettingsItems extends StatelessWidget {
                 child: ListTile(
               title: Text("Logout"),
               subtitle: Text("Logout from the app"),
-              leading: Icon(Icons.exit_to_app),
+              leading: Icon(Icons.exit_to_app, color: Colors.red),
               onTap: () => {_performLogout()},
             )),
           ],
@@ -53,8 +56,6 @@ class SettingsItems extends StatelessWidget {
     while (Navigator.canPop(context)) {
       Navigator.pop(context);
     }
-
-    Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (context) => MyHomePage()));
+    Navigator.pushReplacementNamed(context, "/");
   }
 }

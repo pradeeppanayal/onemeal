@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -63,7 +64,7 @@ class MarkerUtil {
   static BitmapDescriptor servedIconBitmapDescriptor;
 
   static getIcon(String status) {
-    if (status == 'open') {
+    if (status == 'Open') {
       if (hungerIconBitmapDescriptor != null)
         return hungerIconBitmapDescriptor;
       else
@@ -126,6 +127,22 @@ class CommonUtil {
     );
   }
 
+  static LatLng getAsLocation(dynamic attribut) {
+    if (attribut == null) return null;
+    if (attribut is GeoPoint)
+      return LatLng(attribut.latitude, attribut.longitude);
+    return null;
+  }
+
+  static String getDateAsKey({DateTime date}) {
+    if (date == null) date = DateTime.now();
+    String month =
+        date.month < 10 ? "0" + date.month.toString() : date.month.toString();
+    String day =
+        date.day < 10 ? "0" + date.day.toString() : date.day.toString();
+    return date.year.toString() + month + day;
+  }
+
   static double calculateDistance(LatLng l1, LatLng l2) {
     var p = 0.017453292519943295;
     var c = cos;
@@ -136,6 +153,26 @@ class CommonUtil {
             (1 - c((l2.longitude - l1.longitude) * p)) /
             2;
     return 12742 * asin(sqrt(a));
+  }
+
+  static getLocationRange(LatLng providerlocation, double distance) {
+    // ~1 mile of lat and lon in degrees
+    const lat = 0.0144927536231884;
+    const lon = 0.0181818181818182;
+    var lowerLat = providerlocation.latitude - (lat * distance);
+    var lowerLon = providerlocation.longitude - (lon * distance);
+
+    var greaterLat = providerlocation.latitude + (lat * distance);
+    var greaterLon = providerlocation.longitude + (lon * distance);
+
+    return {
+      'lesserGeopoint': new GeoPoint(lowerLat, lowerLon),
+      'greaterGeopoint': new GeoPoint(greaterLat, greaterLon)
+    };
+  }
+
+  static int currentTime() {
+    return DateTime.now().millisecondsSinceEpoch;
   }
 }
 

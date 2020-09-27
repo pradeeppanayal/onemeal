@@ -1,12 +1,16 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:onemealapp/appPage.dart';
+import 'package:onemealapp/userAccount.dart';
 import 'package:onemealapp/utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'auth.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -17,37 +21,19 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'OneMeal App',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-        // This makes the visual density adapt to the platform that you run
-        // the app on. For desktop platforms, the controls will be smaller and
-        // closer together (more dense) than on mobile platforms.
+        primarySwatch: Colors.green,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: MyHomePage(title: 'OneMeal Home Page'),
+      routes: <String, WidgetBuilder>{
+        '/': (BuildContext context) => MyHomePage(title: 'OneMeal Home Page'),
+        '/home': (BuildContext context) => MainPage(),
+      },
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
   MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
 
   final String title;
 
@@ -58,6 +44,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   bool isUserLoggedIn = false;
   bool loading = false;
+  bool loginError = false;
   void initState() {
     super.initState();
     loading = true;
@@ -98,9 +85,14 @@ class _MyHomePageState extends State<MyHomePage> {
                   fit: BoxFit.fill,
                 ),
                 SizedBox(height: 50),
-                loading || isUserLoggedIn
+                (loading || isUserLoggedIn) && !loginError
                     ? Text("Please wait..")
                     : _signInButton(),
+                Visibility(
+                  visible: loginError && isUserLoggedIn,
+                  child: IconButton(
+                      icon: Icon(Icons.refresh), onPressed: () => _trylogin()),
+                ),
                 SizedBox(height: 100),
               ],
             ),
@@ -188,15 +180,13 @@ class _MyHomePageState extends State<MyHomePage> {
     if (loading) return;
     setState(() {
       loading = true;
+      loginError = false;
     });
     authService
         .tryLogin()
         .then((value) => {
-              if (value != null && authService.getUserToken() != null)
-                {
-                  Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (context) => MainPage()))
-                }
+              if (value != null && authService.currentUser != null)
+                {Navigator.pushReplacementNamed(context, "/home")}
             })
         .then((value) => setState(() {
               loading = false;
@@ -208,6 +198,7 @@ class _MyHomePageState extends State<MyHomePage> {
     UserInfoMessageUtil.showMessage("Login failed.", UserInfoMessageMode.ERROR);
     setState(() {
       loading = false;
+      loginError = true;
     });
   }
 }

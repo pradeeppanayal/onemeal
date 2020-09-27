@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:onemealapp/oneMealRestClient.dart';
+import 'package:onemealapp/beans/hunger.dart';
+import 'package:onemealapp/beans/status.dart';
+import 'package:onemealapp/doa/hungerDoa.dart';
 import 'package:onemealapp/utils.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
@@ -30,7 +32,7 @@ class HungerInfoClass {
       leading: Icon(
         Icons.flag,
         size: 50.0,
-        color: status == 'open' ? Colors.red : Colors.green,
+        color: status == HungerStatus.OPEN ? Colors.red : Colors.green,
       ),
       title: Text(title),
       subtitle: Text(
@@ -42,7 +44,7 @@ class HungerInfoClass {
 
 HungerInfoClass hungerInfoClass = HungerInfoClass();
 
-class HungerInfo extends StatelessWidget {
+class HungerInfo extends StatefulWidget {
   HungerInfo(
       {this.panelController,
       this.currentLocation,
@@ -50,22 +52,29 @@ class HungerInfo extends StatelessWidget {
       this.callback,
       this.loading,
       this.loadingStatusUpdate});
-  static final minDistanceToServe = 0.1; //km 100 m
-  final PanelController panelController;
-  final _serveFormValueController = TextEditingController();
-  final selectedElement;
+  final HungerItem selectedElement;
   final callback;
   final currentLocation;
   final loadingStatusUpdate;
   final loading;
+  final PanelController panelController;
+  @override
+  _HungerInfoState createState() => _HungerInfoState();
+}
 
+class _HungerInfoState extends State<HungerInfo> {
+  static final minDistanceToServe = 0.1; //km 100 m
+  final TextEditingController _serveFormValueController =
+      TextEditingController();
+  HungerItem selectedElement;
+  bool loading = false;
   Widget getAsError(String msg) {
     return wrappAsSlidUpPanel(Text(msg));
   }
 
   Widget wrappAsSlidUpPanel(Widget child) {
     return SlidingUpPanel(
-      controller: panelController,
+      controller: widget.panelController,
       panel: Stack(children: [child, getCancelButton()]),
       isDraggable: false,
       minHeight: 0.0,
@@ -81,22 +90,22 @@ class HungerInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (currentLocation == null)
+    selectedElement = widget.selectedElement;
+    if (widget.currentLocation == null)
       return getAsError("Your location could not be determined.");
-    if (selectedElement == null || selectedElement['id'] == null)
+    if (widget.selectedElement == null || widget.selectedElement.id == null)
       return getAsError("There is no item selected.");
 
-    var itemLocation = LatLng(selectedElement['location']['_latitude'],
-        selectedElement['location']['_longitude']);
-    var distance =
-        CommonUtil.calculateDistance(currentLocation, itemLocation); //in kms
+    var itemLocation = widget.selectedElement.location;
+    var distance = CommonUtil.calculateDistance(
+        widget.currentLocation, itemLocation); //in kms
     distance = double.parse(distance.toStringAsFixed(2));
     return wrappAsSlidUpPanel(Padding(
       padding: const EdgeInsets.all(15),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         children: <Widget>[
-          Column(children: hungerInfoClass.getAsChild(selectedElement)),
+          Column(children: hungerInfoClass.getAsChild(widget.selectedElement)),
           _getTheCommentBox(distance),
           _conditionallyGetServeButton(distance),
         ],
@@ -105,9 +114,9 @@ class HungerInfo extends StatelessWidget {
   }
 
   void _hungerInfoCancelClicked() {
-    panelController.panelPosition = 0.0;
+    widget.panelController.panelPosition = 0.0;
     _serveFormValueController.clear();
-    callback(false);
+    widget.callback(false);
   }
 
   void _mealServed() async {
@@ -115,33 +124,37 @@ class HungerInfo extends StatelessWidget {
     var comment = _serveFormValueController.value.text.trim();
     comment = comment.length == 0 ? "No comments." : comment;
 
-    loadingStatusUpdate(true);
+    setState(() {
+      loading = true;
+    });
     try {
-      var resp =
-          await oneMealRestClient.satisfyHunger(selectedElement['id'], comment);
-      if (resp != null) {
-        panelController.panelPosition = 0.0;
+      bool resp = await hungerDOA.satisfyHunger(selectedElement.id, comment);
+      if (resp != null && resp) {
+        widget.panelController.panelPosition = 0.0;
         UserInfoMessageUtil.showMessage(
             "Thank you, It was really kind.", UserInfoMessageMode.SUCCESS);
         _serveFormValueController.clear();
-        callback(true);
+        widget.callback(true);
       } else {
         UserInfoMessageUtil.showMessage(
             "Could not update the status", UserInfoMessageMode.ERROR);
-        callback(false);
+        widget.callback(false);
       }
     } catch (e) {
       UserInfoMessageUtil.showMessage(
-          "Could not update the status", UserInfoMessageMode.ERROR);
+          "Could not update the status. ${e.message}",
+          UserInfoMessageMode.ERROR);
     }
-    loadingStatusUpdate(false);
+    setState(() {
+      loading = false;
+    });
   }
 
   Widget _conditionallyGetServeButton(double distance) {
     //var cancelButton = getCancelButton();
     var emptyWidget = Text("");
-    bool userAtNeedy =
-        (distance < minDistanceToServe) && selectedElement['status'] == 'open';
+    bool userAtNeedy = (distance < minDistanceToServe) &&
+        selectedElement.status == HungerStatus.OPEN;
     return Column(
       children: [
         Row(
@@ -178,7 +191,8 @@ class HungerInfo extends StatelessWidget {
   }
 
   Widget _getTheCommentBox(double distance) {
-    if (distance < minDistanceToServe && selectedElement['status'] == 'open')
+    if (distance < minDistanceToServe &&
+        selectedElement.status == HungerStatus.OPEN)
       return Form(
           child: TextFormField(
         controller: _serveFormValueController,
@@ -188,10 +202,10 @@ class HungerInfo extends StatelessWidget {
             InputDecoration(hintText: "Provide your commet (Optional)."),
         maxLength: 50,
       ));
-    if (selectedElement['status'] == 'open')
+    if (selectedElement.status == HungerStatus.OPEN)
       return Text(
           "Please take few more steps towards the needy to serve the food. You are $distance km away.");
     return Text(
-        "Served by ${selectedElement['servedBy']} with a comment \"${selectedElement['comment']}\".");
+        "Served by ${selectedElement.servedBy} with a comment \"${selectedElement.comment}\".");
   }
 }

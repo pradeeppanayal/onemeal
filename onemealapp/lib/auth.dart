@@ -2,41 +2,42 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:onemealapp/oneMealRestClient.dart';
+import 'package:onemealapp/beans/user.dart';
+import 'package:onemealapp/doa/userDoa.dart';
 import 'package:rxdart/rxdart.dart';
 
 /*
  * @author : Pradeep CH
- * @version : 1.0  
+ * @version : 2.0
  */
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
-  FirebaseUser currentUser;
+  User currentUser;
   String userToken;
   FirebaseMessaging _firebaseMessaging = FirebaseMessaging();
-  var oneMealCurrentUser;
+  OneMealUser oneMealCurrentUser;
 
   PublishSubject loading = PublishSubject();
-  Future<String> googleSignIn() async {
+  Future<void> googleSignIn() async {
     loading.add(true);
     GoogleSignInAccount googleUser = await _googleSignIn.signIn();
     if (googleUser == null) return null;
     GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-    final AuthCredential credential = GoogleAuthProvider.getCredential(
+    final AuthCredential credential = GoogleAuthProvider.credential(
       accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,
     );
-    final AuthResult authResult =
+    final UserCredential authResult =
         await _firebaseAuth.signInWithCredential(credential);
-    final FirebaseUser resultUser = authResult.user;
-    var token = await resultUser.getIdToken();
-    assert(token != null);
-    currentUser = await _firebaseAuth.currentUser();
-    assert(resultUser.uid == currentUser.uid);
+    //final User resultUser = authResult.user;
+    // var token = await resultUser.getIdToken();
+    // assert(token != null);
+    currentUser = _firebaseAuth.currentUser;
+    //assert(resultUser.uid == currentUser.uid);
     loading.add(false);
-    userToken = token.token;
-    return token.token;
+    //userToken = token;
+    //return token;
   }
 
   Future<bool> updatePreferredName(String name) async {
@@ -44,9 +45,13 @@ class AuthService {
       print("No name to update");
       return false;
     }
-    var userPayload = {'username': currentUser.uid, 'preferredName': name};
+    OneMealUser onemealUser = OneMealUser();
+    onemealUser.userName = currentUser.uid;
+    onemealUser.userId = currentUser.uid;
+    onemealUser.preferredName = name;
+
     try {
-      var resp = await oneMealRestClient.addupdateUser(userPayload);
+      var resp = await userDOA.addupdateUser(onemealUser);
       print("User info updated. Response : $resp");
     } catch (e) {
       print("Could not update the user info");
@@ -61,44 +66,33 @@ class AuthService {
       return;
     }
     String notificationToken = await _firebaseMessaging.getToken();
-    var userPayload = {
-      'userId': currentUser.uid,
-      'displayName': currentUser.displayName,
-      'email': currentUser.email,
-      'location': {
-        '_latitude': location.latitude,
-        '_longitude': location.longitude
-      },
-      'username': currentUser.uid,
-      'photoUrl': currentUser.photoUrl,
-      'notificationToken': notificationToken,
-    };
+    OneMealUser oneMealUser = OneMealUser();
+    oneMealUser.userId = currentUser.uid;
+    oneMealUser.displayName = currentUser.displayName;
+    oneMealUser.email = currentUser.email;
+    oneMealUser.location = location;
+    oneMealUser.userName = currentUser.uid;
+    oneMealUser.phtoURL = currentUser.photoURL;
+    oneMealUser.notificationToken = notificationToken;
+
     try {
-      var resp = await oneMealRestClient.addupdateUser(userPayload);
+      var resp = await userDOA.addupdateUser(oneMealUser);
       print("User info updated. Response : $resp");
     } catch (e) {
+      print(e);
       print("Could not update the user info");
     }
     await fetchCurrentUserDetails();
   }
 
   Future<void> fetchCurrentUserDetails() async {
-    try {
-      oneMealCurrentUser =
-          await oneMealRestClient.getUserDetails(currentUser.uid);
-    } catch (e) {
-      print("Error getting user info");
-    }
+    oneMealCurrentUser = await userDOA.getUserDetails(currentUser.uid);
   }
 
-  Future<String> getUserToken() async {
-    if (currentUser == null) return null;
-    return (await currentUser.getIdToken()).token;
-  }
-
-  Future<String> tryLogin() async {
+  Future<bool> tryLogin() async {
     await googleSignIn();
-    return getUserToken();
+    await fetchCurrentUserDetails();
+    return true;
   }
 
   Future<bool> isUserSignedIn() async {
